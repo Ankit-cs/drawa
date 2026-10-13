@@ -3,7 +3,7 @@
 // Three types, each shown and sent to Claude as what it is: output, code (with language and file lines), text.
 // Listens at the page level: the canvas layer doesn't import items.
 import { tipText } from '../lib/tooltip'
-import { make, button, ICON, copyButton, ping, perFrame, EDITABLE, keepOnScreen, clip, uuid } from '../lib/dom'
+import { make, button, ICON, copyButton, ping, perFrame, EDITABLE, keepOnScreen, clip, uuid, typing } from '../lib/dom'
 import { persist, each } from '../lib/store'
 import { items, savedRect, dragOut, changed, nearestFree, onCanvas, rect, viewCenter, centerOn, type Rect } from '../canvas/canvas'
 import { makeWindow, winTitle, removeButton } from '../canvas/window'
@@ -90,7 +90,7 @@ function marked(diff: Element, range: Range, text: string) {
 
 /** What a selection is, judged by where it sits. `null`: nothing to pin (inputs, window tabs, the toolbar). */
 function selectionSource(node: Element, range: Range, text: string): Source | null {
-  if (node.closest(`${EDITABLE}, .win-h, #bar, .pinsel`)) return null
+  if (node.closest(`${EDITABLE}, .compose, .dock, .win-h, #bar, .pinsel`) || typing(document.activeElement)) return null
   // a file (in the inspector or a preview window): code, titled with its path and the selected line numbers
   const src = node.closest<HTMLElement>('.src[data-path]')
   if (src) {
@@ -155,6 +155,7 @@ pinBtn.innerHTML = ICON.pin + 'Pin to canvas'
 pinBtn.hidden = true
 let picked: Source | null = null
 document.addEventListener('selectionchange', () => {
+  if (typing(document.activeElement)) { pinBtn.hidden = true; picked = null; return }
   const sel = getSelection(), text = sel?.toString() ?? ''
   const a = sel?.anchorNode, node = a ? (a instanceof Element ? a : a.parentElement) : null
   const src = sel && sel.rangeCount && text.trim() && node ? selectionSource(node, sel.getRangeAt(0), text) : null
@@ -171,6 +172,7 @@ function placePin() {
   const end = document.createRange()
   end.setStart(sel.focusNode, sel.focusOffset)
   const r = end.getClientRects()[0] ?? sel.getRangeAt(0).getBoundingClientRect()
+  if (!r || (r.width === 0 && r.height === 0 && r.left === 0 && r.top === 0)) { pinBtn.hidden = true; return }
   const box = node?.closest('.log, .win-b, #viewer, #inspector')?.getBoundingClientRect() ?? new DOMRect(0, 0, innerWidth, innerHeight)
   const off = box.bottom < 40 || box.top > innerHeight - 40 || box.right < 40 || box.left > innerWidth - 40
   pinBtn.hidden = off
